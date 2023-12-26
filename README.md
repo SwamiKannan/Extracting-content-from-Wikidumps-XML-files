@@ -57,7 +57,7 @@ python wiki_explore.py <insert path to Wikdumps xml file including the name of t
 The script also does not convert pages which are redirect pages i.e. old pages that when you visit re-direct to another page with the latest data. These are pages with the <redirect=""> tags
 
 ## Usage:
-You can load the json file and extract the content as a Python dictionary as follows:
+You can load the output json file into Python and extract the content as a Python dictionary as follows:
 ```
 dict_files=[]
 with open(<path/filename.json for output file>), encoding='utf-8') as f:
