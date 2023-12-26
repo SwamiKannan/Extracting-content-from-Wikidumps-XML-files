@@ -33,5 +33,22 @@ python wiki_explore.py <insert path to Wikdumps xml file including the name of t
 
 The script also does not convert pages which are redirect pages i.e. old pages that when you visit re-direct to another page with the latest data. These are pages with the <redirect=""> tags
 
+## Usage:
+You can load the json file and extract the content as a Python dictionary as follows:
+```
+dict_files=[]
+with open(<path/filename.json for output file>), encoding='utf-8') as f:
+  for line in f:
+    line_dict=json.loads(line)
+    dict_files.append(line_dict)
+```
 
-Credit: This code is based on <a href="https://jamesthorne.com/">James Thorne</a>'s post: <a href="https://jamesthorne.com/blog/processing-wikipedia-in-a-couple-of-hours/"> Processing Wikipedia in a few hours on a single PC </a>
+This gives us a list of dictionaries. Each dictionary has three keys: 
+1. page: Page title of the article
+2. sentences: Actual content in the article
+3. categories: Categories that this article belongs to
+
+
+## Credits:
+1. This code is based on <a href="https://jamesthorne.com/">James Thorne</a>'s post: <a href="https://jamesthorne.com/blog/processing-wikipedia-in-a-couple-of-hours/"> Processing Wikipedia in a few hours on a single PC </a>
+2. The cleaner function based on regex from <a href="https://github.com/CyberZHG"> CyberZHG</a>'s <a href="https://github.com/CyberZHG/wiki-dump-reader/blob/master/wiki_dump_reader/cleaner.py">Git repo</a>
