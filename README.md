@@ -22,7 +22,14 @@ git clone https://github.com/SwamiKannan/Extracting-categories-in-Wikidumps.git
 python wiki_explore.py <insert path to Wikdumps xml file including the name of the xml file> --output <path to save the output json file> (If no output is given, the output will be stored in the src directory as "output.json"
 ```
 #### Note 1: Wikdumps files are either in .xml formats or .xml.bz2 formats. This code only opens these two files.
-#### Note 2: This script only downloads articles and not other namespaces like: 
+#### Note 2: This script only downloads articles and not other namespaces like:
+<ol>
+  <li>Template: <a href="https://en.wikipedia.org/wiki/Template:Soviet_Naval_reactor">Example</a></li>
+  <li>Portal: <a href="https://en.wikipedia.org/wiki/Portal:Biography">Example</a></li>
+  <li>Talk: <a href="https://en.wikipedia.org/wiki/Wikipedia_talk:About">Example</a></li>
+  <li>User: <a href="https://en.wikipedia.org/wiki/User:Groggler/sandbox">Example</a></li>
+  <li>Wikipedia: <a href="https://en.wikipedia.org/wiki/Wikipedia:Meetup/San_Francisco/SPIE_2020">Example</a></li>
+</ol>
 a. Template: <a href="https://en.wikipedia.org/wiki/Template:Soviet_Naval_reactor">Example</a>
 b. Portal: <a href="https://en.wikipedia.org/wiki/Portal:Biography">Example</a>
 c. Talk: <a href="https://en.wikipedia.org/wiki/Wikipedia_talk:About">Example</a>
