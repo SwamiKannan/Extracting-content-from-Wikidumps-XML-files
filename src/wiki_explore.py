@@ -11,7 +11,7 @@ import xml.sax
 from multiprocessing import Process
 from threading import Thread
 
-from cleaner import Cleaner
+from cleaner import clean_text
 
 logger = logging.getLogger(__name__)
 re_mode = 0
@@ -92,19 +92,11 @@ def process_text(text):
 
 
 def process_article(aq, fq, shutdown, cleaner):
-    print('Initiated processing')
-    print('Shutdown', shutdown)
-    print('Process article status: ', not (shutdown and aq.empty()))
     while not (shutdown and aq.empty() and fq.empty()):
         page_title, doc = aq.get()
-        if not doc:
-            print('No text found for ', page_title)
-        text, categories = process_text(doc)
-        text = cleaner.clean_text(text)
-        # text = doc
-        print('Text post cleaning:', text)
-        text == '' if not text else text
-        print(f'Text for {page_title} has been overcleaned')
+        text = clean_text(doc)
+        text, categories = process_text(text)
+        text = clean_text(text)
         text, categories = process_text(text)
         if not categories:
             categories = ['No categories']
@@ -115,17 +107,15 @@ def process_article(aq, fq, shutdown, cleaner):
 
 
 def write_out(fq, shutdown):
-    print('Writing out')
     while not (shutdown and fq.empty()):
         line = fq.get()
         try:
             out_file.write(line + '\n')
         except Exception as e:
-            print(f'File didnt write Exception {e}')
+            print(f'File didnt write: Exception {e}')
 
 
 def display(aq, fq, reader, shutdown):
-    print('Shutdown status inside loop', shutdown)
     while not (shutdown and aq.empty() and fq.empty()):
         print("Queue sizes: aq={0} fq={1}. Read: {2}".format(
             aq.qsize(),
@@ -135,7 +125,6 @@ def display(aq, fq, reader, shutdown):
 
 
 if __name__ == "__main__":
-    print(os.getcwd())
     shutdown = False
 
     args_parse = argparse.ArgumentParser()
@@ -145,18 +134,16 @@ if __name__ == "__main__":
     args = args_parse.parse_args()
 
     source = args.file
-    target = args.output if args.output else os.getcwd()
+    target = args.output if args.output else 'output.json'
 
     manager = multiprocessing.Manager()
     fq = manager.Queue(maxsize=2000)
     aq = manager.Queue(maxsize=2000)
 
-    c = Cleaner()
-
     if source[-4:] == ".bz2":
         source = bz2.BZ2File(source)
     elif source[-4:] == '.xml':
-        wiki = open(source, 'rb')
+        source = open(source, 'rb')
     else:
         print('File should be either .bz2 or .xml format. Exiting....')
         sys.exit()
@@ -174,16 +161,12 @@ if __name__ == "__main__":
                                args=(aq, fq, shutdown, c))
         processes[i].start()
 
-    for i in range(15):
-        print(f'Process {i}:\t{processes[i].is_alive()}')
-
     write_thread = Thread(target=write_out, args=(fq, shutdown))
     write_thread.start()
     try:
         xml.sax.parse(wiki, reader)
     except Exception as e:
         print('Error', e)
-    print('Tada !')
+    print('Tada ! Processing complete. Close the window and continue...')
     time.sleep(5)
     shutdown = True if aq.empty() and fq.empty() else False
-    print('Shutdown status', shutdown)
