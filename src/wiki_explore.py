@@ -91,28 +91,21 @@ def process_text(text):
     return text, result_cat
 
 
-def process_article(aq, fq, shutdown, cleaner):
+def process_article(aq, fq, shutdown):
     while not (shutdown and aq.empty() and fq.empty()):
         page_title, doc = aq.get()
         text = clean_text(doc)
         text, categories = process_text(text)
-        text = clean_text(text)
-        text, categories = process_text(text)
         if not categories:
             categories = ['No categories']
-        try:
-            fq.put(json.dumps({"page": page_title, "sentences": text, 'categories': categories}, ensure_ascii=False))
-        except Exception as e:
-            print(f'Exception while processing article {page_title}; Exception: {e}')
+        fq.put({"page": page_title, "sentences": text, 'categories': categories})
 
 
 def write_out(fq, shutdown):
     while not (shutdown and fq.empty()):
         line = fq.get()
-        try:
-            out_file.write(line + '\n')
-        except Exception as e:
-            print(f'File didnt write: Exception {e}')
+        line=json.dumps(line, ensure_ascii=False)
+        out_file.write(line + '\n')
 
 
 def display(aq, fq, reader, shutdown):
@@ -156,17 +149,22 @@ if __name__ == "__main__":
     status.start()
 
     processes = {}
-    for i in range(15):
+    for i in range(20):
         processes[i] = Process(target=process_article,
-                               args=(aq, fq, shutdown, c))
+                               args=(aq, fq, shutdown))
         processes[i].start()
 
-    write_thread = Thread(target=write_out, args=(fq, shutdown))
-    write_thread.start()
+    write_threads={}
+    for i in range(10):
+        write_threads[i] = Thread(target=write_out, args=(fq, shutdown))
+        write_threads[i].start()
+    st_time=time.time()
     try:
-        xml.sax.parse(wiki, reader)
+        xml.sax.parse(source, reader)
     except Exception as e:
         print('Error', e)
     print('Tada ! Processing complete. Close the window and continue...')
+    end_time=time.time()
+    print(f'Time for processing: {end_time -st_time}')
     time.sleep(5)
     shutdown = True if aq.empty() and fq.empty() else False
