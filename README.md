@@ -8,7 +8,29 @@
 ## Introduction
 This git converts the XML files from <a href="https://en.wikipedia.org/wiki/Special:Export">Wikipedia's Special:Export downloads </a>into a simple JSON file that can be loaded on as a Python dictionary for downstream processing. I have seen a lot of similar Wikidump converters on Github but that were primarily using regex for cleaning up XML files treating the entire document as one giant string. I wasn't too comfortable with such brute force cleaning since the data was actually presented very cleanly as tags in the XMLs and I wanted to use the XML tags to process the data. 
 
-I came across <a href="https://jamesthorne.com/blog/processing-wikipedia-in-a-couple-of-hours/">this </a> post by <a href="https://jamesthorne.com/">James Thorne</a>'s post. I implemented his blog post with some tweaks and cleanups to the code. This is an incredible walkthrough and huge credit to him.
+I then came across <a href="https://jamesthorne.com/blog/processing-wikipedia-in-a-couple-of-hours/">this </a> post by <a href="https://jamesthorne.com/">James Thorne</a>. I implemented this post with some tweaks and cleanups to the code. This is an incredible walkthrough and huge credit to him.
+
+## Structure and Metrics
+### Construct
+The code uses two queues, one multiprocess.Process object, an XML.sax handler custom class and two Thread objects to parallely process a large XML file. 
+<ul>
+<li>XML.sax.ContentHandler custom object: Parses the XML file for namespace == 0 (articles only), identifies the title and the text tags and puts the content on the aq (Anchor queue named after the <a> tag) queue</li>
+<li>multiprocess.Process object: 
+  <ol>
+  <li>Gets the title and text content from aq </li>
+  <li>Cleans the content of redundant markup </li>
+  <li>Removes the sections of the body text starting with "Also see" (This indicates the end of the main body of the article)</li>
+  <li>Extracts the categories for metadata tagging (helps in LLM setups with RAG architectures)</li>
+  <li>Puts (title, text, categories) on the fq queue (File queue) </li>
+  </ol>
+</li>
+<li> Thread: Extracts the data from the fq queue and writes the content to disk </li>
+<li> aq - Queue contains the parsed output of the xml handler</li>
+<li> fq - Queue contains the cleaned data that needs to be written to disk</li>
+</ul>
+  
+### Performance
+Parses a 127 MB wikidumps xml file with 20000 pages in 63.6 seconds.
 
 ## How to run the code:
 ### 1. Download the repo
