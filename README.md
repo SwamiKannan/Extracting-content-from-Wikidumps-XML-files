@@ -24,7 +24,8 @@ The code uses two queues, one multiprocess.Process object, an XML.sax handler cu
   <li>Puts (title, text, categories) on the fq queue (File queue) </li>
   </ol>
 </li>
-<li> Thread: Extracts the data from the fq queue and writes the content to disk </li>
+<li> Thread 1: Reads the aq and fq queues to display how many files are in each of these queues and how many pages have been parsed (from the XML.sax.ContentHandler custom object's status_count</li>
+<li> Thread 2: Extracts the data from the fq queue and writes the content to disk </li>
 <li> aq - Queue contains the parsed output of the xml handler</li>
 <li> fq - Queue contains the cleaned data that needs to be written to disk</li>
 </ul>
