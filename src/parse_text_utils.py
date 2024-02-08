@@ -1,27 +1,9 @@
 import requests
 import urllib.request
-# from PIL import Image
-# from io import StringIO
 from bs4 import BeautifulSoup
 from texts import sample_text
 import os
 import itertools
-
-# check = "==Firearms license== [[File:Forside våpenkort.jpg|thumb|right|A Norwegian firearms license for a [[.44 " \
-# "Magnum]] [[revolver]], with name and address of the owner, as well as firearm type, brand, caliber and " \ "serial
-# number.]]" check_text = "==Firearms license==[[File:Forside våpenkort.jpg|thumb|right|A Norwegian firearms license
-# for a [[.44 Magnum]] [[revolver]], " \ "with name and address of the owner, as well as firearm type, brand,
-# caliber and serial number.]][[" \ "File:Kleiner Waffenschein Außen.JPG|thumb|right|A German firearms license.]] A
-# '''firearms license'''"
-#
-# for i in range(1, 10):
-#     print(i)
-#
-# files = []
-# end1 = 201
-#
-# print(type(sample_text))
-# print("[[File:" in sample_text)
 
 parsing_errors = []
 
@@ -92,8 +74,10 @@ def download_images(files):
 
 
 def extract_images(ref_text):
+    img_files = {}
     files = parse_image_data(ref_text)
-    img_files = [process_img_tag(file) for file in files]
+    for file in files:
+        img_files.update(process_img_tag(file))
     return img_files
 
 
@@ -117,4 +101,8 @@ if __name__ == "__main__":
     test_img_files = extract_images(sample_text)
     print('Parsing errors', parsing_errors)
     print('Test cat files', test_files)
-    print('Test Image files', test_img_files)
+    print('Full image dict')
+    print(test_img_files)
+    print('Test Image files')
+    for k,v in test_img_files.items():
+        print(k,'\n',v)
