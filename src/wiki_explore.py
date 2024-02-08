@@ -3,14 +3,12 @@ import bz2
 import json
 import logging
 import multiprocessing
-import os
-import re
 import sys
 import time
 import xml.sax
 from multiprocessing import Process
 from threading import Thread
-from image_scraper import extract_categories, extract_images
+from image_scraper import extract_categories, extract_images, download_images_queue
 
 from cleaner import clean_text
 
@@ -82,33 +80,6 @@ class WikiReader(xml.sax.ContentHandler):
             print(f'Could not add to stack {self.read_stack[-1]}\t, {content}\t, {e}')
 
 
-# def process_text(text):
-#     result_img = image_text(text)
-#     final_text, result_cat = cat_text(text)
-#     return final_text, result_cat, result_img
-#
-#
-# def image_text(text):
-#     # rep = dict((re.escape(k), v) for k, v in replacements.items())
-#     # pattern = re.compile("|".join(rep.keys()))
-#     result_img = re.findall(r"\[File:(.*?)\]", text)
-#     print('Image results')
-#     print(result_img)
-#     return result_img
-#
-#
-# def cat_text(text):
-#     rep = dict((re.escape(k), v) for k, v in replacements.items())
-#     pattern = re.compile("|".join(rep.keys()))
-#     result_cat = re.findall(r"\[Category:(.*?)\]", text)
-#     text = pattern.sub(lambda m: rep[re.escape(m.group(0))], text)
-#     text = text.split('See also')[0]
-#     print('From category')
-#     print(result_cat)
-#
-#     return text, result_cat
-
-
 def process_article(aq, fq, shutdown):
     while not (shutdown and aq.empty() and fq.empty()):
         page_title, doc = aq.get()
@@ -154,14 +125,22 @@ if __name__ == "__main__":
 
     args_parse.add_argument("file", help='File name (including path where it is stored')
     args_parse.add_argument("--output", help='File name (including path where it is stored')
+    args_parse.add_argument("--image_download", help='Whether to download the images associated with the xml file')
     args = args_parse.parse_args()
 
     source = args.file
     target = args.output if args.output else 'output.json'
+    images_download = args.image_download if args.image_download else False
 
     manager = multiprocessing.Manager()
     fq = manager.Queue(maxsize=2000)
     aq = manager.Queue(maxsize=2000)
+    if images_download:
+        iq = manager.Queue(maxsize=2000)
+        image_downloader = []
+        for i in range(10):
+            image_downloader[i] = Thread(target=download_images_queue, args=(iq, shutdown))
+            image_downloader[i].start()
 
     if source[-4:] == ".bz2":
         source = bz2.BZ2File(source)
