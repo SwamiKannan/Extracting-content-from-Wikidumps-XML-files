@@ -10,6 +10,7 @@ import time
 import xml.sax
 from multiprocessing import Process
 from threading import Thread
+from image_scraper import extract_categories, extract_images
 
 from cleaner import clean_text
 
@@ -81,31 +82,52 @@ class WikiReader(xml.sax.ContentHandler):
             print(f'Could not add to stack {self.read_stack[-1]}\t, {content}\t, {e}')
 
 
-def process_text(text):
-    rep = dict((re.escape(k), v) for k, v in replacements.items())
-    pattern = re.compile("|".join(rep.keys()))
-    result_cat = re.findall(r"\[Category:(.*?)\]", text)
-    text = pattern.sub(lambda m: rep[re.escape(m.group(0))], text)
-    text = text.split('See also')[0]
-
-    return text, result_cat
+# def process_text(text):
+#     result_img = image_text(text)
+#     final_text, result_cat = cat_text(text)
+#     return final_text, result_cat, result_img
+#
+#
+# def image_text(text):
+#     # rep = dict((re.escape(k), v) for k, v in replacements.items())
+#     # pattern = re.compile("|".join(rep.keys()))
+#     result_img = re.findall(r"\[File:(.*?)\]", text)
+#     print('Image results')
+#     print(result_img)
+#     return result_img
+#
+#
+# def cat_text(text):
+#     rep = dict((re.escape(k), v) for k, v in replacements.items())
+#     pattern = re.compile("|".join(rep.keys()))
+#     result_cat = re.findall(r"\[Category:(.*?)\]", text)
+#     text = pattern.sub(lambda m: rep[re.escape(m.group(0))], text)
+#     text = text.split('See also')[0]
+#     print('From category')
+#     print(result_cat)
+#
+#     return text, result_cat
 
 
 def process_article(aq, fq, shutdown):
     while not (shutdown and aq.empty() and fq.empty()):
         page_title, doc = aq.get()
-        text = clean_text(doc)
-        text, categories = process_text(text)
-        if not categories:
-            categories = ['No categories']
-        fq.put({"page": page_title, "sentences": text, 'categories': categories})
+        image_dict = extract_images(doc)
+        cat_list = extract_categories(doc)
+        text = clean_text(text)
+        if not cat_list:
+            cat_list = []
+        fq.put({"page": page_title, "sentences": text, 'categories': cat_list, "images": image_dict})
 
 
 def write_out(fq, shutdown):
     while not (shutdown and fq.empty()):
         line = fq.get()
-        line=json.dumps(line, ensure_ascii=False)
-        out_file.write(line + '\n')
+        try:
+            line = json.dumps(line, ensure_ascii=False)
+            out_file.write(line + '\n')
+        except:
+            print('File not written')
 
 
 def display(aq, fq, reader, shutdown):
@@ -115,6 +137,14 @@ def display(aq, fq, reader, shutdown):
             fq.qsize(),
             reader.status_count))
         time.sleep(1)
+
+
+# def kill_processes():
+#     status._stop()
+#     for process in processes:
+#         processes[process].kill()
+#     for write_thread in write_threads:
+#         write_threads[write_thread]._stop()
 
 
 if __name__ == "__main__":
@@ -154,17 +184,19 @@ if __name__ == "__main__":
                                args=(aq, fq, shutdown))
         processes[i].start()
 
-    write_threads={}
+    write_threads = {}
     for i in range(10):
         write_threads[i] = Thread(target=write_out, args=(fq, shutdown))
         write_threads[i].start()
-    st_time=time.time()
+    st_time = time.time()
     try:
         xml.sax.parse(source, reader)
     except Exception as e:
         print('Error', e)
+    end_time = time.time()
     print('Tada ! Processing complete. Close the window and continue...')
-    end_time=time.time()
-    print(f'Time for processing: {end_time -st_time}')
+    print(f'Time for processing: {end_time - st_time}')
     time.sleep(5)
     shutdown = True if aq.empty() and fq.empty() else False
+    # if shutdown:
+    #     kill_processes()
