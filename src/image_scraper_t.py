@@ -5,7 +5,6 @@ import urllib.request
 from bs4 import BeautifulSoup
 from texts import sample_text
 import os
-import itertools
 
 # check = "==Firearms license== [[File:Forside våpenkort.jpg|thumb|right|A Norwegian firearms license for a [[.44 " \
 # "Magnum]] [[revolver]], with name and address of the owner, as well as firearm type, brand, caliber and " \ "serial
@@ -24,24 +23,7 @@ import itertools
 # print("[[File:" in sample_text)
 
 parsing_errors = []
-
-
-def parse_data(str_target, ref_text):
-    files = []
-    while str_target in ref_text:
-        count = 1
-        st_index = ref_text.find(str_target) + 7
-        for r in range(st_index, len(ref_text) + 1):
-            if ref_text[r:r + 2] == '[[':
-                count += 1
-            if ref_text[r:r + 2] == ']]':
-                count -= 1
-                if count == 0:
-                    text = ref_text[st_index:r]
-                    files.append(text)
-                    ref_text = ref_text[r + 2:]
-                    break
-    return files
+files = []
 
 
 def process_img_tag(text):
@@ -69,13 +51,30 @@ def process_img_tag(text):
     return text_dict
 
 
-def parse_image_data(ref_text):
-    img_files = parse_data("[[File:", ref_text)
-    return img_files
+def parse_image_data(check2):
+    global files
+    while "[[File:" in check2:
+        count = 1
+        st_index = check2.find('[[File:') + 7
+        for r in range(st_index, len(check2) + 1):
+            st_index = check2.find('[[File:') + 7
+            if check2[r:r + 2] == '[[':
+                count += 1
+            if check2[r:r + 2] == ']]':
+                count -= 1
+                if count == 0:
+                    text = check2[st_index:r]
+                    if text:
+                        img_dict = process_img_tag(text)
+                        files.append(img_dict)
+                    check2 = check2[r + 2:]
+                    break
+    return files
 
 
 def download_images(files):
-    if 'images' not in os.listdir():
+    print(os.getcwd())
+    if not 'images' in os.listdir():
         os.mkdir('images')
     img_path = os.path.join('images')
     image_links = [(key, a[key]['image_url']) for a in files for key in a.keys()]
@@ -85,36 +84,22 @@ def download_images(files):
             parser = BeautifulSoup(response.text, 'html.parser')
             link = parser.find('div', class_="fullImageLink").find('a')
             url_img = link['href']
-            urllib.request.urlretrieve(url_img, os.path.join(img_path, name))
+            urllib.request.urlretrieve(url_img, os.path.join(img_path,name))
             print(f' {name} file written')
         else:
             print(url)
 
 
-def extract_images(ref_text):
-    files = parse_image_data(ref_text)
-    img_files = [process_img_tag(file) for file in files]
-    return img_files
-
-
-def parse_cat_data(ref_text):
-    return parse_data("[[Category:", ref_text)
-
-
-def process_cat_data(cat_text):
-    cat_text = cat_text.replace('| ', '').replace('ory:', '')
-    return cat_text.split('|')
-
-
-def extract_categories(ref_text):
-    files = parse_cat_data(ref_text)
-    return list(itertools.chain.from_iterable([process_cat_data(t) for t in files]))
-
-
-if __name__ == "__main__":
-    test_link = "https://en.wikipedia.org/wiki/Overview_of_gun_laws_by_nation"
-    test_files = extract_categories(sample_text)
-    test_img_files = extract_images(sample_text)
-    print('Parsing errors', parsing_errors)
-    print('Test cat files', test_files)
-    print('Test Image files', test_img_files)
+test_link = "https://en.wikipedia.org/wiki/Overview_of_gun_laws_by_nation"
+# print(list(map(parse_image_data, check_text)))
+files = parse_image_data(sample_text)
+print('Parsing errors', parsing_errors)
+for file in files:
+    for it in file.keys():
+        print(it)
+        print(file[it].items())
+    print('\n')
+download_images(files)
+if parsing_errors:
+    with open('parser_errors.txt', 'a+', encoding='utf-8') as f:
+        f.write('\n'.join(parsing_errors))
