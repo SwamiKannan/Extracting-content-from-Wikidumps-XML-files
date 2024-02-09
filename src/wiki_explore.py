@@ -103,7 +103,11 @@ def process_article(aq, fq, iq, eq, shutdown):
 def download_images_queue(img_queue, img_path, shutdown):
     while not shutdown and img_queue.empty():
         file = img_queue.get()
-        download_images(file, img_path)
+        response_code = download_images(file, img_path)
+        if response_code == 429:
+            img_queue.put(file)
+            time.sleep(10)
+
 
 
 def write_out(fq, shutdown):
