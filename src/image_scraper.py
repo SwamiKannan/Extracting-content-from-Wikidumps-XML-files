@@ -70,6 +70,7 @@ def download_images(image_dict, path):
             time.sleep(2)
         else:
             print('Image from Url not downloaded:\t', 'Response code:', response.status_code)
+    return response.status_code
 
 
 def extract_images(ref_text):
