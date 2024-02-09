@@ -3,12 +3,13 @@ import bz2
 import json
 import logging
 import multiprocessing
+import os
 import sys
 import time
 import xml.sax
 from multiprocessing import Process
 from threading import Thread
-from image_scraper import extract_categories, extract_images, download_images_queue
+from image_scraper import extract_categories, extract_images, download_images
 
 from cleaner import clean_text
 
@@ -17,7 +18,8 @@ re_mode = 0
 replacements = {'[[': '', ']]': '', '==': ''}
 
 
-# cleaner.py from https://github.com/CyberZHG Git repo: https://github.com/CyberZHG/wiki-dump-reader/blob/master/wiki_dump_reader/cleaner.py
+# cleaner.py from https://github.com/CyberZHG Git repo:
+# https://github.com/CyberZHG/wiki-dump-reader/blob/master/wiki_dump_reader/cleaner.py
 
 
 class WikiReader(xml.sax.ContentHandler):
@@ -80,15 +82,28 @@ class WikiReader(xml.sax.ContentHandler):
             print(f'Could not add to stack {self.read_stack[-1]}\t, {content}\t, {e}')
 
 
-def process_article(aq, fq, shutdown):
+def process_article(aq, fq, iq, eq, shutdown):
     while not (shutdown and aq.empty() and fq.empty()):
         page_title, doc = aq.get()
-        image_dict = extract_images(doc)
+        image_dict, parsing_error = extract_images(doc)
         cat_list = extract_categories(doc)
-        text = clean_text(text)
+        text = clean_text(doc)
         if not cat_list:
             cat_list = []
+        if image_dict:
+            iq.put(image_dict)
+        else:
+            image_dict = {}
+            print('No image dict for ', page_title)
         fq.put({"page": page_title, "sentences": text, 'categories': cat_list, "images": image_dict})
+        if parsing_error:
+            eq.put(parsing_error)
+
+
+def download_images_queue(img_queue, img_path, shutdown):
+    while not shutdown and img_queue.empty():
+        file = img_queue.get()
+        download_images(file, img_path)
 
 
 def write_out(fq, shutdown):
@@ -101,13 +116,31 @@ def write_out(fq, shutdown):
             print('File not written')
 
 
-def display(aq, fq, reader, shutdown):
-    while not (shutdown and aq.empty() and fq.empty()):
-        print("Queue sizes: aq={0} fq={1}. Read: {2}".format(
-            aq.qsize(),
-            fq.qsize(),
-            reader.status_count))
-        time.sleep(1)
+def parsing_errors(eq, shutdown):
+    while not (shutdown and eq.empty()):
+        line = eq.get()
+        try:
+            error_file.write(line + '\n')
+        except Exception as e:
+            print(f'Error File not written for: {line}. Exception: {e}')
+
+
+def display(aq, fq, iq, reader, shutdown):
+    if iq:
+        while not (shutdown and aq.empty() and fq.empty() and iq.empty()):
+            print("Queue sizes: aq={0} fq={1} iq={2}. Read: {3}".format(
+                aq.qsize(),
+                fq.qsize(),
+                iq.qsize(),
+                reader.status_count))
+            time.sleep(1)
+    else:
+        while not (shutdown and aq.empty() and fq.empty()):
+            print("Queue sizes: aq={0} fq={1}. Read: {2}".format(
+                aq.qsize(),
+                fq.qsize(),
+                reader.status_count))
+            time.sleep(1)
 
 
 # def kill_processes():
@@ -132,15 +165,21 @@ if __name__ == "__main__":
     target = args.output if args.output else 'output.json'
     images_download = args.image_download if args.image_download else False
 
+    error = 'errors'
+    image_path = os.getcwd()
+
     manager = multiprocessing.Manager()
     fq = manager.Queue(maxsize=2000)
     aq = manager.Queue(maxsize=2000)
+    eq = manager.Queue(maxsize=2000)
     if images_download:
         iq = manager.Queue(maxsize=2000)
-        image_downloader = []
+        image_downloader = {}
         for i in range(10):
-            image_downloader[i] = Thread(target=download_images_queue, args=(iq, shutdown))
+            image_downloader[i] = Thread(target=download_images_queue, args=(iq, image_path, shutdown))
             image_downloader[i].start()
+    else:
+        iq = None
 
     if source[-4:] == ".bz2":
         source = bz2.BZ2File(source)
@@ -151,22 +190,28 @@ if __name__ == "__main__":
         sys.exit()
 
     out_file = open(target, "w+", encoding='utf-8')
+    error_file = open(error, 'w+', encoding='utf-8')
 
     reader = WikiReader(lambda ns: ns == 0, aq.put)
 
-    status = Thread(target=display, args=(aq, fq, reader, shutdown))
+    status = Thread(target=display, args=(aq, fq, iq, reader, shutdown))
     status.start()
 
     processes = {}
     for i in range(20):
         processes[i] = Process(target=process_article,
-                               args=(aq, fq, shutdown))
+                               args=(aq, fq, iq, eq, shutdown))
         processes[i].start()
 
     write_threads = {}
     for i in range(10):
         write_threads[i] = Thread(target=write_out, args=(fq, shutdown))
         write_threads[i].start()
+
+    for i in range(10):
+        write_threads[i] = Thread(target=parsing_errors, args=(eq, shutdown))
+        write_threads[i].start()
+
     st_time = time.time()
     try:
         xml.sax.parse(source, reader)
@@ -175,7 +220,10 @@ if __name__ == "__main__":
     end_time = time.time()
     print('Tada ! Processing complete. Close the window and continue...')
     print(f'Time for processing: {end_time - st_time}')
+    out_file.close()
+    error_file.close()
     time.sleep(5)
     shutdown = True if aq.empty() and fq.empty() else False
+
     # if shutdown:
     #     kill_processes()
