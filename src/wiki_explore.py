@@ -18,6 +18,10 @@ re_mode = 0
 replacements = {'[[': '', ']]': '', '==': ''}
 
 
+HEADER = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
+
+
 # cleaner.py from https://github.com/CyberZHG Git repo:
 # https://github.com/CyberZHG/wiki-dump-reader/blob/master/wiki_dump_reader/cleaner.py
 
@@ -91,23 +95,52 @@ def process_article(aq, fq, iq, eq, shutdown):
         if not cat_list:
             cat_list = []
         if image_dict:
-            iq.put(image_dict)
+            iq.put((page_title,image_dict))
+            for v in image_dict.values():
+                del v['image_url']
         else:
+
             image_dict = {}
-            print('No image dict for ', page_title)
+            #print('No image dict for ', page_title)
         fq.put({"page": page_title, "sentences": text, 'categories': cat_list, "images": image_dict})
         if parsing_error:
             eq.put(parsing_error)
 
 
-def download_images_queue(img_queue, img_path, shutdown):
-    while not shutdown and img_queue.empty():
-        file = img_queue.get()
-        response_code = download_images(file, img_path)
-        if response_code == 429:
-            img_queue.put(file)
-            time.sleep(10)
-
+def download_images_queue(iq, eq, img_path, shutdown):
+    error = None
+    while not (iq.empty() and shutdown):
+        title,file = iq.get()
+        try:
+            response_code = download_images(file, img_path, title)
+            if response_code == 429:
+                print('Too many requests')
+                iq.put(file)
+                time.sleep(10)
+            elif response_code == 404:
+                print('File not found for page: ', title, 'and urls: ',file)
+            elif response_code == 200:
+                continue
+            else:
+                error = 'Unknown file error : File not moved' +' Response code: '+response_code+' File head: '+title+' Image: '+file
+                print('Unknown file error : File not moved', response_code, title, file)
+        except KeyError as e:
+            for v in file.values():
+                continue
+                #print(f"Key error for downloading images {v['image_url']}")
+                error = f"Key error for downloading images {v['image_url']}"
+        except TypeError as e:
+            continue
+            print('None type for file:\t', file,'\tPage name\t', title)
+        except UnboundLocalError as e:
+            continue
+            print('Cannot access img_url value in:',file.values())
+        except Exception as e:
+            for k in file:
+                print('Not able to download images. Exception:', {e},'\t Page name:\t', title,'\tImage Name:\t', k)
+                error = f"Not able to download images. Exception:', {e},'\t Page name:\t {title},\tImage Name:\t {k}"
+        if error:
+            eq.put(error)
 
 
 def write_out(fq, shutdown):
@@ -129,13 +162,14 @@ def parsing_errors(eq, shutdown):
             print(f'Error File not written for: {line}. Exception: {e}')
 
 
-def display(aq, fq, iq, reader, shutdown):
+def display(aq, fq, iq, eq, reader, shutdown):
     if iq:
         while not (shutdown and aq.empty() and fq.empty() and iq.empty()):
-            print("Queue sizes: aq={0} fq={1} iq={2}. Read: {3}".format(
+            print("Queue sizes: aq={0} fq={1} iq={2} eq={3}. Read: {4}".format(
                 aq.qsize(),
                 fq.qsize(),
                 iq.qsize(),
+                eq.qsize(),
                 reader.status_count))
             time.sleep(1)
     else:
@@ -160,14 +194,19 @@ if __name__ == "__main__":
 
     args_parse = argparse.ArgumentParser()
 
-    args_parse.add_argument("file", help='File name (including path where it is stored')
-    args_parse.add_argument("--output", help='File name (including path where it is stored')
-    args_parse.add_argument("--image_download", help='Whether to download the images associated with the xml file')
-    args = args_parse.parse_args()
+    # args_parse.add_argument("file", help='File name (including path where it is stored')
+    # args_parse.add_argument("--output", help='File name (including path where it is stored')
+    # args_parse.add_argument("--image_download", help='Whether to download the images associated with the xml file')
+    # args = args_parse.parse_args()
+    #
+    # source = args.file
+    # target = args.output if args.output else 'output.json'
+    # images_download = args.image_download if args.image_download else False
 
-    source = args.file
-    target = args.output if args.output else 'output.json'
-    images_download = args.image_download if args.image_download else False
+    source = "D:\\to_do\\100daysproject\\wiki_science_categories\\wikiscrapes\\physics\\data\\content\\processed\\with_template\\Physics-1.xml"
+    images_download = True
+    target = 'output.json'
+
 
     error = 'errors'
     image_path = os.getcwd()
@@ -177,10 +216,10 @@ if __name__ == "__main__":
     aq = manager.Queue(maxsize=2000)
     eq = manager.Queue(maxsize=2000)
     if images_download:
-        iq = manager.Queue(maxsize=2000)
+        iq = manager.Queue(maxsize=10000)
         image_downloader = {}
         for i in range(10):
-            image_downloader[i] = Thread(target=download_images_queue, args=(iq, image_path, shutdown))
+            image_downloader[i] = Thread(target=download_images_queue, args=(iq, eq, image_path, shutdown))
             image_downloader[i].start()
     else:
         iq = None
@@ -198,11 +237,11 @@ if __name__ == "__main__":
 
     reader = WikiReader(lambda ns: ns == 0, aq.put)
 
-    status = Thread(target=display, args=(aq, fq, iq, reader, shutdown))
+    status = Thread(target=display, args=(aq, fq, iq, eq, reader, shutdown))
     status.start()
 
     processes = {}
-    for i in range(20):
+    for i in range(5):
         processes[i] = Process(target=process_article,
                                args=(aq, fq, iq, eq, shutdown))
         processes[i].start()
@@ -212,9 +251,10 @@ if __name__ == "__main__":
         write_threads[i] = Thread(target=write_out, args=(fq, shutdown))
         write_threads[i].start()
 
+    write_errors = {}
     for i in range(10):
-        write_threads[i] = Thread(target=parsing_errors, args=(eq, shutdown))
-        write_threads[i].start()
+        write_errors[i] = Thread(target=parsing_errors, args=(eq, shutdown))
+        write_errors[i].start()
 
     st_time = time.time()
     try:
@@ -222,12 +262,14 @@ if __name__ == "__main__":
     except Exception as e:
         print('Error', e)
     end_time = time.time()
+
     print('Tada ! Processing complete. Close the window and continue...')
     print(f'Time for processing: {end_time - st_time}')
+    time.sleep(30)
     out_file.close()
     error_file.close()
-    time.sleep(5)
-    shutdown = True if aq.empty() and fq.empty() else False
+
+    shutdown = True if aq.empty() and fq.empty() and iq.empty() and eq.empty() else False
 
     # if shutdown:
     #     kill_processes()
