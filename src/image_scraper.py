@@ -1,9 +1,28 @@
 import requests
-import urllib.request
+from shutil import copyfileobj
 from bs4 import BeautifulSoup
 import os
 import itertools
 import time
+import shutil
+
+HEADER = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
+URLLIB_HEADER = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 '
+                  'Safari/537.36 SE 2.X MetaSr 1.0'}
+
+
+def download_img_from_url(url, out_path):
+    try:
+        response = requests.get(url, stream=True, headers=URLLIB_HEADER)
+    except Exception as e:
+        print(f'Error in retrieval:\t{response.status_code}\tException: {e}\t URL: {url}')
+    try:
+        with open(out_path, 'wb') as out_file:
+            shutil.copyfileobj(response.raw, out_file)
+    except Exception as e:
+        print('Unable to save image file. Exception:', e)
 
 
 def parse_data(str_target, ref_text):
@@ -29,22 +48,42 @@ def process_img_tag(text):
     text = text.replace('[[', '').replace(']]', '')
     text_space = text.split('|')
     name = text_space[0]
-    link = 'https://commons.wikimedia.org/wiki/File:' + '_'.join(name.split()) + "#file"
+    img_file_name = '_'.join(name.split())
+    filename = ''.join([n for n in name if n not in ['/\\?%*:|"<>]/g"']])
+    filename = filename.replace('&','%26')
+    link1 = 'https://commons.wikimedia.org/wiki/File:' + img_file_name + "#file"
+    link2 = 'https://en.wikipedia.org/wiki/File:' + img_file_name
+    link1 = link1.replace('&','%26')
+    link2 = link2.replace('&','%26')
     if len(text_space) > 3:
-        text_dict = {name: {'image_url': link,
-                            'type': text_space[1],
-                            'align': text_space[2],
-                            'Caption': text_space[3]
-                            }
+        text_dict = {filename: {'image_url': [link1, link2],
+                                'image_file_name': img_file_name,
+                                'type': text_space[1],
+                                'align': text_space[2],
+                                'Caption': text_space[3],
+                                'original_name': name
+                                }
                      }
     elif len(text_space) == 3:
-        text_dict = {name: {'image_url': link,
-                            'type': text_space[1],
-                            'align': text_space[3] if len(text_space) > 3 else None,
-                            'Caption': text_space[2]}
+        text_dict = {filename: {'image_url': [link1, link2],
+                                'image_file_name': img_file_name,
+                                'type': text_space[1],
+                                'align': text_space[3] if len(text_space) > 3 else None,
+                                'Caption': text_space[2],
+                                'original_name': name
+                                }
+                     }
+    elif len(text_space) <= 2:
+        text_dict = {filename: {'image_url': [link1, link2],
+                                'image_file_name': img_file_name,
+                                'type': None,
+                                'align': text_space[1] if len(text_space) == 2 else None,
+                                'Caption': None,
+                                'original_name': name}
                      }
     else:
         parsing_errors = text_space
+        print('Errored out text_space', text_space)
         text_dict = None
     return text_dict, parsing_errors
 
@@ -54,22 +93,37 @@ def parse_image_data(ref_text):
     return img_files
 
 
-def download_images(image_dict, path):
+def parse_and_download_image_from_link(response, path, name):
+    parser = BeautifulSoup(response.text, 'html.parser')
+    link = parser.find('div', class_="fullImageLink").find('a')
+    url_img = link['href']
+    if not url_img.startswith("https:"):
+        url_img = 'https:' + url_img
+    out_path = os.path.join(path, name)
+    download_img_from_url(url_img, out_path)
+    return url_img
+
+
+def download_images(image_dict, path, title):
     if 'images' not in os.listdir(os.path.join(path)):
         os.mkdir(os.path.join('images'))
     img_path = os.path.join(path, 'images')
     image_links = [(k, v['image_url']) for k, v in image_dict.items()]
-    for (name, url) in image_links:
-        response = requests.get(url)
+    for (name, urls) in image_links:
+        response = requests.get(urls[0], headers=HEADER)
         if response.status_code == 200:
-            parser = BeautifulSoup(response.text, 'html.parser')
-            link = parser.find('div', class_="fullImageLink").find('a')
-            url_img = link['href']
-            urllib.request.urlretrieve(url_img, os.path.join(img_path, name))
-            print(f' {name} file written')
-            time.sleep(2)
+            img_url = parse_and_download_image_from_link(response, img_path, name)
+            # print(f' {name} file written')
+        elif response.status_code == 404:
+            response = requests.get(urls[1], headers=HEADER)
+            if response.status_code == 200:
+                img_url = parse_and_download_image_from_link(response, img_path, name)
+            elif response.status_code == 404:
+                print('Download images (): 404 File not found: Inner url \t', img_url, '\tLink:\t', urls[1],
+                      'image name:\t', name, '\tpage name:\t', title)
         else:
-            print('Image from Url not downloaded:\t', 'Response code:', response.status_code)
+            continue
+            # print('Image from Url not downloaded:\t', 'Response code:', response.status_code, '\timage:', url,'\tName:',name)
     return response.status_code
 
 
