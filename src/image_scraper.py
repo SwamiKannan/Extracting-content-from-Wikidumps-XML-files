@@ -12,6 +12,10 @@ URLLIB_HEADER = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.153 '
                   'Safari/537.36 SE 2.X MetaSr 1.0'}
 
+ref_list = 'abcdefghijklmnopqrstuvwxyz'
+nums_list = '0123456789_'
+final_ref = ref_list + ref_list.upper() + nums_list
+
 
 def download_img_from_url(url, out_path):
     try:
@@ -20,7 +24,7 @@ def download_img_from_url(url, out_path):
         print(f'Error in retrieval:\t{response.status_code}\tException: {e}\t URL: {url}')
     try:
         with open(out_path, 'wb') as out_file:
-            shutil.copyfileobj(response.raw, out_file)
+            copyfileobj(response.raw, out_file)
     except Exception as e:
         print('Unable to save image file. Exception:', e)
 
@@ -43,18 +47,30 @@ def parse_data(str_target, ref_text):
     return files
 
 
+def process_filename(filename):
+    filextn = (filename.rfind('.'))
+    file_extn = filename[filextn:]
+    name = filename[:filextn]
+    name = "a_1" if name == "" else name
+    name = name.replace(" ", "_").replace('-', "_")
+    filename1 = ''.join(
+        [c for c in name if c in final_ref])
+    filename1 = 'a'+filename1 if filename1.startswith('_') else filename1
+    name = filename1 + file_extn
+    return name
+
+
 def process_img_tag(text):
     parsing_errors = None
     text = text.replace('[[', '').replace(']]', '')
     text_space = text.split('|')
     name = text_space[0]
     img_file_name = '_'.join(name.split())
-    filename = ''.join([n for n in name if n not in ['/\\?%*:|"<>]/g"']])
-    filename = filename.replace('&','%26')
+    filename = process_filename(name)
     link1 = 'https://commons.wikimedia.org/wiki/File:' + img_file_name + "#file"
     link2 = 'https://en.wikipedia.org/wiki/File:' + img_file_name
-    link1 = link1.replace('&','%26')
-    link2 = link2.replace('&','%26')
+    link1 = link1.replace('&', '%26')
+    link2 = link2.replace('&', '%26')
     if len(text_space) > 3:
         text_dict = {filename: {'image_url': [link1, link2],
                                 'image_file_name': img_file_name,
