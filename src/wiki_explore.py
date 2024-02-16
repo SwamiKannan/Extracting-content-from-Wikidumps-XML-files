@@ -9,7 +9,7 @@ import time
 import xml.sax
 from multiprocessing import Process
 from threading import Thread
-from image_scraper import extract_categories, extract_images, download_images
+from image_scraper import extract_categories, extract_images, download_images, image_path
 
 from cleaner import clean_text
 
@@ -109,31 +109,36 @@ def download_images_queue(iq, eq, img_path, shutdown):
     while not (iq.empty() and shutdown):
         title, file = iq.get()
         try:
-            response_code = download_images(file, img_path, title)
+            response_code, error = download_images(file, img_path, title)
+            if not error:
+                error = ''
             if response_code == 429:
                 print('Too many requests')
                 iq.put(file)
                 time.sleep(10)
             elif response_code == 404:
                 print('File not found for page: ', title, 'and urls: ', file)
+                error = error + 'File not found for page: ', title, 'and urls: ', file
             elif response_code == 200:
                 continue
             else:
-                error = 'Unknown file error : File not moved' + ' Response code: ' + response_code + ' File head: ' + title + ' Image: ' + file
+                error = error + 'Unknown file error : File not moved' + ' Response code: ' + response_code + ' File head: ' + title + ' Image: ' + file
                 print('Unknown file error : File not moved', response_code, title, file)
         except KeyError as e:
             for v in file.values():
                 # print(f"Key error for downloading images {v['image_url']}")
-                error = f"Key error for downloading images {v['image_url']}"
+                error = error + "Key error for downloading images" + str(v['image_url'])
         except TypeError as e:
             print('None type for file:\t', file, '\tPage name\t', title)
+            error = error + 'None type for file:\t'+ str(file)+ '\tPage name\t'+ str(title)
         except UnboundLocalError as e:
-            print('Cannot access img_url value in:', file.values())
+            print('Cannot access img_url value in:', str(file.values()))
+            error = error + 'Cannot access img_url value in:', str(file.values())
         except Exception as e:
             for k in file:
                 print('Not able to download images. Exception:', {e}, '\t Page name:\t', title, '\tImage Name:\t', k)
-                error = f"Not able to download images. Exception:', {e},'\t Page name:\t {title},\tImage Name:\t {k}"
-        if error:
+                error = error + f"Not able to download images. Exception: " +str(e) + 'Page name:\t' + str(title)+'\t Image Name:\t' +str(k)
+        if error != '':
             eq.put(error)
 
 
@@ -202,7 +207,7 @@ if __name__ == "__main__":
     target = 'output.json'
 
     error = 'errors'
-    image_path = os.getcwd()
+
 
     manager = multiprocessing.Manager()
     fq = manager.Queue(maxsize=2000)
@@ -255,12 +260,11 @@ if __name__ == "__main__":
     except Exception as e:
         print('Error', e)
     end_time = time.time()
-
-    print('Tada ! Processing complete. Close the window and continue...')
-    print(f'Time for processing: {end_time - st_time}')
-    time.sleep(30)
-    out_file.close()
-    error_file.close()
+    if aq.empty() and fq.empty() and iq.empty() and eq.empty():
+        print('Tada ! Processing complete. Close the window and continue...')
+        print(f'Time for processing: {end_time - st_time}')
+        out_file.close()
+        error_file.close()
 
     shutdown = True if aq.empty() and fq.empty() and iq.empty() and eq.empty() else False
 
