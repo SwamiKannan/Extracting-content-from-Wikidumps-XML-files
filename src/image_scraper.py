@@ -57,13 +57,6 @@ def parse_data(str_target, ref_text):
 
 
 def process_filename(filename):
-    not_blank = False
-    if filename.startswith('.'):
-        not_blank = True
-        print('Original filename', filename)
-        filename = 'a_1' + filename if filename.startswith('.') else filename
-        while filename in os.listdir(image_path):
-            filename = 'a_'+filename
     filextn = (filename.rfind('.'))
     file_extn = filename[filextn:]
     file_extn = ".tiff" if file_extn == '.tif' else file_extn  # PIL.Image can read in .tiff but not .tif for some reason
@@ -73,7 +66,11 @@ def process_filename(filename):
         [c for c in name if c in final_ref])
     filename1 = 'a' + filename1 if filename1.startswith('_') else filename1
     name = filename1 + file_extn
-    if not_blank:
+    if name.startswith('.'):
+        print('Original filename', name)
+        name = 'a_1_' + name
+        while name in os.listdir(image_path):
+            name = 'a_'+name
         print('New filename', name)
     return name
 
