@@ -48,10 +48,11 @@ def parse_data(str_target, ref_text):
 
 
 def process_filename(filename):
+    filename = 'a_1' + filename if filename.startswith('.') else filename
     filextn = (filename.rfind('.'))
     file_extn = filename[filextn:]
+    file_extn = ".tiff" if file_extn == '.tif' else file_extn  #PIL.Image can read in .tiff but not .tif for some reason
     name = filename[:filextn]
-    name = "a_1" if name == "" else name
     name = name.replace(" ", "_").replace('-', "_")
     filename1 = ''.join(
         [c for c in name if c in final_ref])
