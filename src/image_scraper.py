@@ -6,6 +6,8 @@ import itertools
 import time
 import shutil
 
+
+
 HEADER = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                         "Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
 URLLIB_HEADER = {
@@ -15,18 +17,25 @@ URLLIB_HEADER = {
 ref_list = 'abcdefghijklmnopqrstuvwxyz'
 nums_list = '0123456789_'
 final_ref = ref_list + ref_list.upper() + nums_list
+orig_path = os.getcwd()
+if 'images' not in os.listdir(os.path.join(orig_path)):
+    os.mkdir(os.path.join('images'))
+image_path = os.path.join('images')
+
 
 
 def download_img_from_url(url, out_path):
-    try:
-        response = requests.get(url, stream=True, headers=URLLIB_HEADER)
-    except Exception as e:
-        print(f'Error in retrieval:\t{response.status_code}\tException: {e}\t URL: {url}')
+    error = None
+    response = requests.get(url, stream=True, headers=URLLIB_HEADER)
+    if response.status_code >= 300:
+        error = f'Error in retrieval:\t{response.status_code}\t Error: {response.reason}  URL: {url}'
     try:
         with open(out_path, 'wb') as out_file:
             copyfileobj(response.raw, out_file)
     except Exception as e:
         print('Unable to save image file. Exception:', e)
+        error = 'Unable to save image file. Exception: ' + str(e)
+    return error
 
 
 def parse_data(str_target, ref_text):
@@ -48,16 +57,24 @@ def parse_data(str_target, ref_text):
 
 
 def process_filename(filename):
-    filename = 'a_1' + filename if filename.startswith('.') else filename
+    not_blank = False
+    if filename.startswith('.'):
+        not_blank = True
+        print('Original filename', filename)
+        filename = 'a_1' + filename if filename.startswith('.') else filename
+        while filename in os.listdir(image_path):
+            filename = 'a_'+filename
     filextn = (filename.rfind('.'))
     file_extn = filename[filextn:]
-    file_extn = ".tiff" if file_extn == '.tif' else file_extn  #PIL.Image can read in .tiff but not .tif for some reason
+    file_extn = ".tiff" if file_extn == '.tif' else file_extn  # PIL.Image can read in .tiff but not .tif for some reason
     name = filename[:filextn]
     name = name.replace(" ", "_").replace('-', "_")
     filename1 = ''.join(
         [c for c in name if c in final_ref])
-    filename1 = 'a'+filename1 if filename1.startswith('_') else filename1
+    filename1 = 'a' + filename1 if filename1.startswith('_') else filename1
     name = filename1 + file_extn
+    if not_blank:
+        print('New filename', name)
     return name
 
 
@@ -117,31 +134,36 @@ def parse_and_download_image_from_link(response, path, name):
     if not url_img.startswith("https:"):
         url_img = 'https:' + url_img
     out_path = os.path.join(path, name)
-    download_img_from_url(url_img, out_path)
-    return url_img
+    error = download_img_from_url(url_img, out_path)
+    return url_img, error
 
 
 def download_images(image_dict, path, title):
-    if 'images' not in os.listdir(os.path.join(path)):
-        os.mkdir(os.path.join('images'))
-    img_path = os.path.join(path, 'images')
+    img_path = path
+    error = None
     image_links = [(k, v['image_url']) for k, v in image_dict.items()]
     for (name, urls) in image_links:
+        if name.startswith('.'):
+            print('We missed ', name )
         response = requests.get(urls[0], headers=HEADER)
         if response.status_code == 200:
-            img_url = parse_and_download_image_from_link(response, img_path, name)
+            img_url, error = parse_and_download_image_from_link(response, img_path, name)
             # print(f' {name} file written')
         elif response.status_code == 404:
             response = requests.get(urls[1], headers=HEADER)
             if response.status_code == 200:
-                img_url = parse_and_download_image_from_link(response, img_path, name)
+                img_url, error = parse_and_download_image_from_link(response, img_path, name)
             elif response.status_code == 404:
-                print('Download images (): 404 File not found: Inner url \t', img_url, '\tLink:\t', urls[1],
+                print('Download images (): 404 File not found: Inner url \tLink:\t', urls[1],
                       'image name:\t', name, '\tpage name:\t', title)
+                error_msg = 'Download images (): 404 File not found: Inner url \tLink:\t' + urls[
+                    1] + 'image name:\t' + name + '\tpage name:\t' + title
+                error = error_msg if error is None else error + error_msg
         else:
             continue
-            # print('Image from Url not downloaded:\t', 'Response code:', response.status_code, '\timage:', url,'\tName:',name)
-    return response.status_code
+            # print('Image from Url not downloaded:\t', 'Response code:', response.status_code, '\timage:', url,
+            # '\tName:',name)
+    return response.status_code, error
 
 
 def extract_images(ref_text):
