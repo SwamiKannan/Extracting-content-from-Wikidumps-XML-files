@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 re_mode = 0
 replacements = {'[[': '', ']]': '', '==': ''}
 
-
 HEADER = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                         "Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
 
@@ -53,7 +52,6 @@ class WikiReader(xml.sax.ContentHandler):
 
         elif tag_name == "text":
             self.read_text = ""
-
 
         else:
             return
@@ -95,13 +93,12 @@ def process_article(aq, fq, iq, eq, shutdown):
         if not cat_list:
             cat_list = []
         if image_dict:
-            iq.put((page_title,image_dict))
+            iq.put((page_title, image_dict))
             for v in image_dict.values():
                 del v['image_url']
         else:
-
             image_dict = {}
-            #print('No image dict for ', page_title)
+            # print('No image dict for ', page_title)
         fq.put({"page": page_title, "sentences": text, 'categories': cat_list, "images": image_dict})
         if parsing_error:
             eq.put(parsing_error)
@@ -110,7 +107,7 @@ def process_article(aq, fq, iq, eq, shutdown):
 def download_images_queue(iq, eq, img_path, shutdown):
     error = None
     while not (iq.empty() and shutdown):
-        title,file = iq.get()
+        title, file = iq.get()
         try:
             response_code = download_images(file, img_path, title)
             if response_code == 429:
@@ -118,26 +115,23 @@ def download_images_queue(iq, eq, img_path, shutdown):
                 iq.put(file)
                 time.sleep(10)
             elif response_code == 404:
-                print('File not found for page: ', title, 'and urls: ',file)
+                print('File not found for page: ', title, 'and urls: ', file)
             elif response_code == 200:
                 continue
             else:
-                error = 'Unknown file error : File not moved' +' Response code: '+response_code+' File head: '+title+' Image: '+file
+                error = 'Unknown file error : File not moved' + ' Response code: ' + response_code + ' File head: ' + title + ' Image: ' + file
                 print('Unknown file error : File not moved', response_code, title, file)
         except KeyError as e:
             for v in file.values():
-                continue
-                #print(f"Key error for downloading images {v['image_url']}")
+                # print(f"Key error for downloading images {v['image_url']}")
                 error = f"Key error for downloading images {v['image_url']}"
         except TypeError as e:
-            continue
-            print('None type for file:\t', file,'\tPage name\t', title)
+            print('None type for file:\t', file, '\tPage name\t', title)
         except UnboundLocalError as e:
-            continue
-            print('Cannot access img_url value in:',file.values())
+            print('Cannot access img_url value in:', file.values())
         except Exception as e:
             for k in file:
-                print('Not able to download images. Exception:', {e},'\t Page name:\t', title,'\tImage Name:\t', k)
+                print('Not able to download images. Exception:', {e}, '\t Page name:\t', title, '\tImage Name:\t', k)
                 error = f"Not able to download images. Exception:', {e},'\t Page name:\t {title},\tImage Name:\t {k}"
         if error:
             eq.put(error)
@@ -203,10 +197,9 @@ if __name__ == "__main__":
     # target = args.output if args.output else 'output.json'
     # images_download = args.image_download if args.image_download else False
 
-    source = "D:\\to_do\\100daysproject\\wiki_science_categories\\wikiscrapes\\physics\\data\\content\\processed\\with_template\\Physics-1.xml"
+    source = "D:\\to_do\\100daysproject\\scrapers\\wikiscrapes\\physics\\data\\content\\processed\\with_template\\Physics-1.xml"
     images_download = True
     target = 'output.json'
-
 
     error = 'errors'
     image_path = os.getcwd()
