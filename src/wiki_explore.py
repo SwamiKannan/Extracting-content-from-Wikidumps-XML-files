@@ -10,6 +10,8 @@ import xml.sax
 from multiprocessing import Process
 from threading import Thread
 from image_scraper import extract_categories, extract_images, download_images, image_path
+import re
+import pickle
 
 from cleaner import clean_text
 
@@ -19,6 +21,8 @@ replacements = {'[[': '', ']]': '', '==': ''}
 
 HEADER = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                         "Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
+
+content = []
 
 
 # cleaner.py from https://github.com/CyberZHG Git repo:
@@ -32,9 +36,9 @@ class WikiReader(xml.sax.ContentHandler):
         self.filter = ns_filter
 
         self.read_stack = []
-        self.read_text = ''
-        self.read_title = ''
-        self.read_namespace = ''
+        self.read_text = None
+        self.read_title = None
+        self.read_namespace = None
 
         self.status_count = 0
         self.callback = callback
@@ -80,25 +84,41 @@ class WikiReader(xml.sax.ContentHandler):
 
             if self.read_stack[-1] == "ns":
                 self.read_namespace = int(content)
+
         except Exception as e:
             print(f'Could not add to stack {self.read_stack[-1]}\t, {content}\t, {e}')
 
 
-def process_article(aq, fq, iq, eq, shutdown):
+def process_text(text):
+    rep = dict((re.escape(k), v) for k, v in replacements.items())
+    pattern = re.compile("|".join(rep.keys()))
+    text = pattern.sub(lambda m: rep[re.escape(m.group(0))], text)
+    text = text.split('==References==')[0]
+    return text
+
+
+def process_article(aq, fq, iq, eq, image_download, shutdown):
+    global content
     while not (shutdown and aq.empty() and fq.empty()):
         page_title, doc = aq.get()
-        image_dict, parsing_error = extract_images(doc)
+        if image_download:
+            image_dict, parsing_error = extract_images(doc)
+            if image_dict:
+                iq.put((page_title, image_dict))
+            else:
+                image_dict = "None"
+        else:
+            image_dict = "None"
+            parsing_error = None
         cat_list = extract_categories(doc)
-        text = clean_text(doc)
+        text = process_text(doc)
+        text = clean_text(text)
+        text = text.encode()
         if not cat_list:
             cat_list = []
-        if image_dict:
-            iq.put((page_title, image_dict))
-            for v in image_dict.values():
-                del v['image_url']
-        else:
-            image_dict = {}
-            # print('No image dict for ', page_title)
+        # if image_dict:
+        #     for v in image_dict.values():
+        #         del v['image_url']
         fq.put({"page": page_title, "sentences": text, 'categories': cat_list, "images": image_dict})
         if parsing_error:
             eq.put(parsing_error)
@@ -130,33 +150,31 @@ def download_images_queue(iq, eq, img_path, shutdown):
                 error = error + "Key error for downloading images" + str(v['image_url'])
         except TypeError as e:
             print('None type for file:\t', file, '\tPage name\t', title)
-            error = error + 'None type for file:\t'+ str(file)+ '\tPage name\t'+ str(title)
+            error = error + 'None type for file:\t' + str(file) + '\tPage name\t' + str(title)
         except UnboundLocalError as e:
             print('Cannot access img_url value in:', str(file.values()))
             error = error + 'Cannot access img_url value in:', str(file.values())
         except Exception as e:
             for k in file:
                 print('Not able to download images. Exception:', {e}, '\t Page name:\t', title, '\tImage Name:\t', k)
-                error = error + f"Not able to download images. Exception: " +str(e) + 'Page name:\t' + str(title)+'\t Image Name:\t' +str(k)
+                error = error + f"Not able to download images. Exception: " + str(e) + 'Page name:\t' + str(
+                    title) + '\t Image Name:\t' + str(k)
         if error != '':
             eq.put(error)
 
 
-def write_out(fq, shutdown):
+def write_out(fq, shutdown, content):
     while not (shutdown and fq.empty()):
         line = fq.get()
-        try:
-            line = json.dumps(line, ensure_ascii=False)
-            out_file.write(line + '\n')
-        except:
-            print('File not written')
+        pickle.dump(line, out_file)
+        # content.append(line)
 
 
 def parsing_errors(eq, shutdown):
     while not (shutdown and eq.empty()):
         line = eq.get()
         try:
-            error_file.write(line + '\n')
+            pickle.dump(line, out_file)
         except Exception as e:
             print(f'Error File not written for: {line}. Exception: {e}')
 
@@ -172,7 +190,7 @@ def display(aq, fq, iq, eq, reader, shutdown):
                 reader.status_count))
             time.sleep(1)
     else:
-        while not (shutdown and aq.empty() and fq.empty()):
+        while not (shutdown and aq.empty()):
             print("Queue sizes: aq={0} fq={1}. Read: {2}".format(
                 aq.qsize(),
                 fq.qsize(),
@@ -203,11 +221,10 @@ if __name__ == "__main__":
     # images_download = args.image_download if args.image_download else False
 
     source = "D:\\to_do\\100daysproject\\scrapers\\wikiscrapes\\physics\\data\\content\\processed\\with_template\\Physics-1.xml"
-    images_download = True
+    images_download = False
     target = 'output.json'
 
     error = 'errors'
-
 
     manager = multiprocessing.Manager()
     fq = manager.Queue(maxsize=2000)
@@ -225,13 +242,13 @@ if __name__ == "__main__":
     if source[-4:] == ".bz2":
         source = bz2.BZ2File(source)
     elif source[-4:] == '.xml':
-        source = open(source, 'rb')
+        source = open(source, 'r', encoding='utf-8')
     else:
         print('File should be either .bz2 or .xml format. Exiting....')
         sys.exit()
 
-    out_file = open(target, "w+", encoding='utf-8')
-    error_file = open(error, 'w+', encoding='utf-8')
+    out_file = open(target, "wb+")
+    error_file = open(error, 'wb+')
 
     reader = WikiReader(lambda ns: ns == 0, aq.put)
 
@@ -241,12 +258,12 @@ if __name__ == "__main__":
     processes = {}
     for i in range(5):
         processes[i] = Process(target=process_article,
-                               args=(aq, fq, iq, eq, shutdown))
+                               args=(aq, fq, iq, eq, images_download, shutdown))
         processes[i].start()
 
     write_threads = {}
-    for i in range(10):
-        write_threads[i] = Thread(target=write_out, args=(fq, shutdown))
+    for i in range(1):
+        write_threads[i] = Thread(target=write_out, args=(fq, shutdown, content))
         write_threads[i].start()
 
     write_errors = {}
@@ -260,13 +277,22 @@ if __name__ == "__main__":
     except Exception as e:
         print('Error', e)
     end_time = time.time()
-    if aq.empty() and fq.empty() and iq.empty() and eq.empty():
+    time.sleep(10)
+    if images_download:
+        shutdown = True if aq.empty() and fq.empty() and iq.empty() and eq.empty() else False
+    else:
+        shutdown = True if aq.empty() and fq.empty() and eq.empty() else False
+    if shutdown:
+        time.sleep(10)
+        #pickle.dump(content, out_file)
+        try:
+            out_file.close()
+            print('Output file closed')
+        except Exception as e:
+            print('Output file could not be closed due to exception: ', e)
+        error_file.close()
         print('Tada ! Processing complete. Close the window and continue...')
         print(f'Time for processing: {end_time - st_time}')
-        out_file.close()
-        error_file.close()
 
-    shutdown = True if aq.empty() and fq.empty() and iq.empty() and eq.empty() else False
-
-    # if shutdown:
+        # if shutdown:
     #     kill_processes()
