@@ -17,10 +17,8 @@ URLLIB_HEADER = {
 ref_list = 'abcdefghijklmnopqrstuvwxyz'
 nums_list = '0123456789_'
 final_ref = ref_list + ref_list.upper() + nums_list
-orig_path = os.getcwd()
-if 'images' not in os.listdir(os.path.join(orig_path)):
-    os.mkdir(os.path.join('images'))
-image_path = os.path.join('images')
+
+
 
 
 
@@ -56,7 +54,7 @@ def parse_data(str_target, ref_text):
     return files
 
 
-def process_filename(filename):
+def process_filename(filename,image_path):
     filextn = (filename.rfind('.'))
     file_extn = filename[filextn:]
     file_extn = ".tiff" if file_extn == '.tif' else file_extn  # PIL.Image can read in .tiff but not .tif for some reason
@@ -73,13 +71,13 @@ def process_filename(filename):
     return name
 
 
-def process_img_tag(text):
+def process_img_tag(text,image_path):
     parsing_errors = None
     text = text.replace('[[', '').replace(']]', '')
     text_space = text.split('|')
     name = text_space[0]
     img_file_name = '_'.join(name.split())
-    filename = process_filename(name)
+    filename = process_filename(name,image_path)
     link1 = 'https://commons.wikimedia.org/wiki/File:' + img_file_name + "#file"
     link2 = 'https://en.wikipedia.org/wiki/File:' + img_file_name
     link1 = link1.replace('&', '%26')
@@ -161,13 +159,13 @@ def download_images(image_dict, path, title):
     return response.status_code, error
 
 
-def extract_images(ref_text):
+def extract_images(ref_text,image_path):
     parsing_error = None
     files = parse_image_data(ref_text)
     if files:
         img_files = {}
         for file in files:
-            img_dict, parsing_error = process_img_tag(file)
+            img_dict, parsing_error = process_img_tag(file, image_path)
             if img_dict:
                 img_files.update(img_dict)
     else:
