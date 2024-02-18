@@ -67,11 +67,9 @@ def process_filename(filename):
     filename1 = 'a' + filename1 if filename1.startswith('_') else filename1
     name = filename1 + file_extn
     if name.startswith('.'):
-        print('Original filename', name)
         name = 'a_1_' + name
         while name in os.listdir(image_path):
             name = 'a_'+name
-        print('New filename', name)
     return name
 
 
