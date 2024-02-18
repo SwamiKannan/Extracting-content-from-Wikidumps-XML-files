@@ -1,6 +1,5 @@
 import argparse
 import bz2
-import json
 import logging
 import multiprocessing
 import os
@@ -9,7 +8,7 @@ import time
 import xml.sax
 from multiprocessing import Process
 from threading import Thread
-from image_scraper import extract_categories, extract_images, download_images, image_path
+from image_scraper import extract_categories, extract_images, download_images
 import re
 import pickle
 
@@ -21,8 +20,6 @@ replacements = {'[[': '', ']]': '', '==': ''}
 
 HEADER = {'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) "
                         "Chrome/42.0.2311.135 Safari/537.36 Edge/12.246"}
-
-content = []
 
 
 # cleaner.py from https://github.com/CyberZHG Git repo:
@@ -97,12 +94,11 @@ def process_text(text):
     return text
 
 
-def process_article(aq, fq, iq, eq, image_download, shutdown):
-    global content
+def process_article(aq, fq, iq, eq, image_path, image_download, shutdown):
     while not (shutdown and aq.empty() and fq.empty()):
         page_title, doc = aq.get()
         if image_download:
-            image_dict, parsing_error = extract_images(doc)
+            image_dict, parsing_error = extract_images(doc, image_path)
             if image_dict:
                 iq.put((page_title, image_dict))
             else:
@@ -163,18 +159,17 @@ def download_images_queue(iq, eq, img_path, shutdown):
             eq.put(error)
 
 
-def write_out(fq, shutdown, content):
+def write_out(fq, shutdown):
     while not (shutdown and fq.empty()):
         line = fq.get()
         pickle.dump(line, out_file)
-        # content.append(line)
 
 
 def parsing_errors(eq, shutdown):
     while not (shutdown and eq.empty()):
         line = eq.get()
         try:
-            pickle.dump(line, out_file)
+            error_out.write(line)
         except Exception as e:
             print(f'Error File not written for: {line}. Exception: {e}')
 
@@ -221,11 +216,23 @@ if __name__ == "__main__":
     # images_download = args.image_download if args.image_download else False
 
     source = "D:\\to_do\\100daysproject\\scrapers\\wikiscrapes\\physics\\data\\content\\processed\\with_template\\Physics-1.xml"
-    images_download = False
-    target = 'output.json'
-
-    error = 'errors'
-
+    images_download = True
+    DATA_PATH = 'data'
+    target_file = 'output.json'
+    TARGET_PATH = os.path.join(DATA_PATH)
+    if TARGET_PATH not in os.listdir():
+        os.mkdir(os.path.join(TARGET_PATH))
+    target = os.path.join(TARGET_PATH, target_file)
+    error_file = 'errors'
+    ERROR_PATH = os.path.join(DATA_PATH)
+    if ERROR_PATH not in os.listdir():
+        os.mkdir(os.path.join(ERROR_PATH))
+    error = os.path.join(ERROR_PATH, error_file)
+    INIT_IMAGE_FOLDER = 'init_images'
+    # orig_path = os.getcwd()
+    if INIT_IMAGE_FOLDER not in os.listdir(os.path.join(DATA_PATH)):
+        os.makedirs(os.path.join(DATA_PATH, INIT_IMAGE_FOLDER))
+    image_path = os.path.join(DATA_PATH, INIT_IMAGE_FOLDER)
     manager = multiprocessing.Manager()
     fq = manager.Queue(maxsize=2000)
     aq = manager.Queue(maxsize=2000)
@@ -233,9 +240,10 @@ if __name__ == "__main__":
     if images_download:
         iq = manager.Queue(maxsize=10000)
         image_downloader = {}
-        for i in range(10):
+        for i in range(20):
             image_downloader[i] = Thread(target=download_images_queue, args=(iq, eq, image_path, shutdown))
             image_downloader[i].start()
+
     else:
         iq = None
 
@@ -248,7 +256,7 @@ if __name__ == "__main__":
         sys.exit()
 
     out_file = open(target, "wb+")
-    error_file = open(error, 'wb+')
+    error_out = open(error, 'w+')
 
     reader = WikiReader(lambda ns: ns == 0, aq.put)
 
@@ -258,12 +266,12 @@ if __name__ == "__main__":
     processes = {}
     for i in range(5):
         processes[i] = Process(target=process_article,
-                               args=(aq, fq, iq, eq, images_download, shutdown))
+                               args=(aq, fq, iq, eq, image_path, images_download, shutdown))
         processes[i].start()
 
     write_threads = {}
     for i in range(1):
-        write_threads[i] = Thread(target=write_out, args=(fq, shutdown, content))
+        write_threads[i] = Thread(target=write_out, args=(fq, shutdown))
         write_threads[i].start()
 
     write_errors = {}
@@ -279,20 +287,22 @@ if __name__ == "__main__":
     end_time = time.time()
     time.sleep(10)
     if images_download:
-        shutdown = True if aq.empty() and fq.empty() and iq.empty() and eq.empty() else False
+        shutdown = True if (aq.empty() and fq.empty() and iq.empty() and eq.empty()) else False
     else:
-        shutdown = True if aq.empty() and fq.empty() and eq.empty() else False
+        shutdown = True if (aq.empty() and fq.empty() and eq.empty()) else False
     if shutdown:
+        print('Initiating shutdown')
         time.sleep(10)
-        #pickle.dump(content, out_file)
+        # pickle.dump(content, out_file)
         try:
             out_file.close()
             print('Output file closed')
         except Exception as e:
             print('Output file could not be closed due to exception: ', e)
-        error_file.close()
+        error_out.close()
         print('Tada ! Processing complete. Close the window and continue...')
         print(f'Time for processing: {end_time - st_time}')
+        sys.exit()
 
         # if shutdown:
     #     kill_processes()
