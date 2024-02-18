@@ -169,7 +169,7 @@ def parsing_errors(eq, shutdown):
     while not (shutdown and eq.empty()):
         line = eq.get()
         try:
-            error_out.write(line)
+            pickle.dump(line, error_out)
         except Exception as e:
             print(f'Error File not written for: {line}. Exception: {e}')
 
@@ -215,14 +215,15 @@ if __name__ == "__main__":
     # target = args.output if args.output else 'output.json'
     # images_download = args.image_download if args.image_download else False
 
-    source = "D:\\to_do\\100daysproject\\scrapers\\wikiscrapes\\physics\\data\\content\\processed\\with_template\\Physics-1.xml"
+    source = "D:\\to_do\\100daysproject\\scrapers\\wikiscrapes\\physics\\data\\content\\processed\\with_template" \
+             "\\Physics-1.xml"
     images_download = True
     DATA_PATH = 'data'
-    target_file = 'output.json'
-    TARGET_PATH = os.path.join(DATA_PATH)
-    if TARGET_PATH not in os.listdir():
-        os.mkdir(os.path.join(TARGET_PATH))
-    target = os.path.join(TARGET_PATH, target_file)
+    TARGET_FILE = 'output.json'
+    data_path = os.path.join(DATA_PATH)
+    if data_path not in os.listdir():
+        os.mkdir(os.path.join(data_path))
+    target = os.path.join(DATA_PATH, TARGET_FILE)
     error_file = 'errors'
     ERROR_PATH = os.path.join(DATA_PATH)
     if ERROR_PATH not in os.listdir():
@@ -275,7 +276,7 @@ if __name__ == "__main__":
         write_threads[i].start()
 
     write_errors = {}
-    for i in range(10):
+    for i in range(1):
         write_errors[i] = Thread(target=parsing_errors, args=(eq, shutdown))
         write_errors[i].start()
 
