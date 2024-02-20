@@ -3,7 +3,6 @@ import PIL
 import os
 import shutil
 import pickle
-import json
 
 
 # from svglib.svglib import svg2rlg
@@ -136,10 +135,10 @@ def rebuild_output(input_file, output_file):
             keys = item['images'].keys()
             for key in list(keys):
                 if key not in file_list:
-                    items[item_l]['images'].pop(key)
+                    del items[item_l]['images'][key]
         else:
             item['images']=None
-
+        print(item['images'])
     print('Checking rebuilt output file....')
     recheck = True
     for item in items:
