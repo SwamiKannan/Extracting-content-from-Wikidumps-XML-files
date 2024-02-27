@@ -5,17 +5,6 @@ import shutil
 import pickle
 
 
-# from svglib.svglib import svg2rlg
-# from reportlab.graphics import renderPM
-
-
-# SVG_TO_PNG_PATH = 'svgtopng'
-
-
-# def svg_png(svg_file):  # NOT WORKING
-#     drawing = svg2rlg(svg_file)
-#     img = renderPM.drawToPIL(drawing)
-#     return img
 def loadall(filename):
     with open(filename, "rb") as f:
         while True:
@@ -25,27 +14,9 @@ def loadall(filename):
                 break
 
 
-DATA_PATH = 'data'
-SOURCE_FOLDER = 'init_images'
-data_path = os.path.join(DATA_PATH)
-source_path = os.path.join(DATA_PATH, SOURCE_FOLDER)
-
-TARGET_FOLDER = 'images'
-if TARGET_FOLDER not in os.listdir(data_path):
-    try:
-        os.mkdir(os.path.join(data_path, TARGET_FOLDER))
-    except Exception as e:
-        print('Images folder could not be created because of Exception ', e)
-target = os.path.join(data_path, TARGET_FOLDER)
-
 TARGET_SIZE = (640, 480)
 PIL.Image.MAX_IMAGE_PIXELS = int(1082882052 * 1.5)
 MAX_FILE_SIZE = 512
-
-SOURCE_FILE = 'output_1.json'
-source_file_path = os.path.join(data_path, SOURCE_FILE)
-TARGET_PKL_FILE = 'final_output.pkl'
-target_pkl_path = os.path.join(data_path, TARGET_PKL_FILE)
 
 errors = []
 error_extns = set()
@@ -60,7 +31,7 @@ def get_oversized_extensions():
     print(f"File extensions of type {', '.join(high_size_extns)} have a file size larger than {MAX_FILE_SIZE}")
 
 
-def resize_files(sourcepath=source_path, targetpath=target):
+def resize_files(sourcepath, targetpath):
     print('Resizing initiated......')
     image_list = os.listdir(sourcepath)
     list_size = len(image_list)
@@ -118,40 +89,45 @@ def resize_files(sourcepath=source_path, targetpath=target):
         else:
             shutil.copy(os.path.join(sourcepath, filename), targetpath)
         if file_no % (int(list_size / 10)) == 0:
-            print(f"{file_no+1} files processed. {((100*file_no)/list_size):.2f} percent complete.")
+            print(f"{file_no + 1} files processed. {round((100 * file_no) / list_size)} percent complete.")
     print('Resizing complete. Resized files are stored in ', targetpath)
 
+    del img
 
-def rebuild_output(input_file, output_file):
+
+def rebuild_output(input_file, output_file, image_path):
     print(f'Initiating updation of {input_file}')
     fo = open(output_file, 'wb')
-    file_list = os.listdir('data//images')
+    file_list = os.listdir(image_path)
     file_ish = input_file
     items = list(loadall(file_ish))
     print('Rebuilding json file......')
     for item_l in range(len(items)):
         item = items[item_l]
-        if isinstance(item['images'], dict):
-            keys = item['images'].keys()
+        key1 = list(item.keys())[0]
+        vals = item[key1]['images']
+        if isinstance(vals, dict):
+            keys = vals.keys()
             for key in list(keys):
                 if key not in file_list:
-                    del items[item_l]['images'][key]
+                    del items[item_l][key1]['images'][key]
         else:
-            item['images']=None
-        print(item['images'])
+            item[key1]['images'] = None
     print('Checking rebuilt output file....')
     recheck = True
     for item in items:
-        if isinstance(item['images'], dict):
-            keys = item['images'].keys()
+        key1 = list(item.keys())[0]
+        vals = item[key1]['images']
+        if isinstance(vals, dict):
+            keys = vals.keys()
             for key in keys:
                 if key not in file_list:
                     print('Recheck failed')
                     recheck = False
                     break
         else:
-            assert item['images'] is None
-        break
+            assert vals is None
+            continue
     if recheck:
         print('Rechecking complete....writing to output file')
         for item in items:
@@ -160,20 +136,30 @@ def rebuild_output(input_file, output_file):
         print('Error in rebuilding output file.')
 
 
-def loadall(filename):
-    with open(filename, "rb") as f:
-        while True:
-            try:
-                yield pickle.load(f)
-            except EOFError:
-                break
-
-
-def resize_and_update(sourcepath=source_path, targetpath=target, target_filepath=target_pkl_path):
+def resize_and_update(sourcepath, targetpath, source_filepath, target_filepath):
     resize_files(sourcepath, targetpath)
-    rebuild_output(source_file_path, target_filepath)
+    rebuild_output(source_filepath, target_filepath, targetpath)
     print('Resizing and update done !')
 
 
 if __name__ == "__main__":
-    resize_and_update()
+    DATA_PATH = '..//..//data'
+    SOURCE_FOLDER = 'init_images'
+    data_path = os.path.join(DATA_PATH)
+    source_path = os.path.join(DATA_PATH, SOURCE_FOLDER)
+
+    TARGET_FOLDER = 'images'
+    if TARGET_FOLDER not in os.listdir(data_path):
+        try:
+            os.mkdir(os.path.join(data_path, TARGET_FOLDER))
+        except Exception as e:
+            print('Images folder could not be created because of Exception ', e)
+    target = os.path.join(data_path, TARGET_FOLDER)
+
+    SOURCE_FILE = 'output.json'
+    source_file_path = os.path.join(data_path, SOURCE_FILE)
+    TARGET_PKL_FILE = 'final_output.pkl'
+    target_pkl_path = os.path.join(data_path, TARGET_PKL_FILE)
+
+    resize_and_update(sourcepath=source_path, targetpath=target, source_filepath=source_file_path,
+                      target_filepath=target_pkl_path)
