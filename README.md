@@ -31,7 +31,7 @@ The code uses two queues, one multiprocess.Process object, an XML.sax handler cu
 </ul>
   
 ### Performance
-Parses a 127 MB wikidumps xml file with 20000 pages in 63.6 seconds.
+Parses a 127 MB wikidumps xml file with 20000 pages in 63.6 seconds (without images. Key bottleneck in processing time is downloading of large images.)
 
 ## How to run the code:
 ### 1. Download the repo
