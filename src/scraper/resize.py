@@ -94,6 +94,7 @@ def resize_files(sourcepath, targetpath):
             print(f"{file_no + 1} files processed. {round((100 * file_no) / list_size)} percent complete.")
     print('Resizing complete. Resized files are stored in ', targetpath)
 
+    del img
 
 def rebuild_output(input_file, output_file, image_path):
     print(f'Initiating updation of {input_file}')
