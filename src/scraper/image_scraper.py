@@ -31,8 +31,7 @@ def download_img_from_url(url, out_path):
         with open(out_path, 'wb') as out_file:
             copyfileobj(response.raw, out_file)
     except Exception as e:
-        print('Unable to save image file. Exception:', e)
-        error = 'Unable to save image file. Exception: ' + str(e)
+        error = 'Unable to save image file from '+url+'. Exception: ' + str(e)
     return error
 
 
@@ -109,8 +108,7 @@ def process_img_tag(text,image_path):
                                 'original_name': name}
                      }
     else:
-        parsing_errors = text_space
-        print('Errored out text_space', text_space)
+        parsing_errors ='Errored out text_space' +str(text_space)
         text_dict = None
     return text_dict, parsing_errors
 
@@ -136,8 +134,6 @@ def download_images(image_dict, path, title):
     error = None
     image_links = [(k, v['image_url']) for k, v in image_dict.items()]
     for (name, urls) in image_links:
-        if name.startswith('.'):
-            print('We missed ', name )
         response = requests.get(urls[0], headers=HEADER)
         if response.status_code == 200:
             img_url, error = parse_and_download_image_from_link(response, img_path, name)
@@ -147,8 +143,6 @@ def download_images(image_dict, path, title):
             if response.status_code == 200:
                 img_url, error = parse_and_download_image_from_link(response, img_path, name)
             elif response.status_code == 404:
-                print('Download images (): 404 File not found: Inner url \tLink:\t', urls[1],
-                      'image name:\t', name, '\tpage name:\t', title)
                 error_msg = 'Download images (): 404 File not found: Inner url \tLink:\t' + urls[
                     1] + 'image name:\t' + name + '\tpage name:\t' + title
                 error = error_msg if error is None else error + error_msg
