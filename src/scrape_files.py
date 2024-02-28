@@ -2,7 +2,6 @@ import argparse
 import bz2
 import multiprocessing
 import os
-import sys
 import time
 import xml.sax
 import shutil
@@ -37,7 +36,7 @@ if __name__ == "__main__":
         print(
             'Error ! resize_and_rebuild is True but images_download is False. To resize images, we first need to '
             'download the images. Please set images_download to True or set resize_and_rebuild to False')
-        sys.exit()
+        exit()
 
     # Set all paths
 
@@ -98,7 +97,7 @@ if __name__ == "__main__":
         source = open(source, 'r', encoding='utf-8')
     else:
         print('File should be either .bz2 or .xml format. Exiting....')
-        sys.exit()
+        exit()
 
     out_file = open(target, "wb+")
     error_out = open(error, 'ab+')
@@ -148,7 +147,6 @@ if __name__ == "__main__":
         event.set()
     try:
         out_file.close()
-        print('Output file closed')
     except Exception as e:
         print('Output file could not be closed due to exception: ', e)
     error_out.close()
@@ -166,7 +164,7 @@ if __name__ == "__main__":
     else:
         os.rename(image_path, final_image_path)
         shutil.move(target, final_json_path)
-    print('All activities complete.')
-    sys.exit()
+    print('All activities complete. Please close this window')
+    exit()
     # if shutdown:
     #     kill_processes()
