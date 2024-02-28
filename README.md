@@ -44,10 +44,15 @@ git clone https://github.com/SwamiKannan/Extracting-categories-in-Wikidumps.git
 ```
 python wiki_explore.py <insert path to Wikdumps xml file including the name of the xml file> --output <path to save the output json file> --image_download <True/ False> --resize_and_rebuild <True / False>
 ```
-where --image_download describes whether the corresponding images should be downloaded or not
-      -- resize_and_rebuild will resize all image files greater than 1MB to within 640 X 480 
-                                 ignore all files that are greater than 1MB and cannot be processed to 640 X 480
-
+where:
+<ul>
+    <li> --image_download describes whether the corresponding images should be downloaded or not</li>
+    <li> --resize_and_rebuild will:</li>
+            <ul>
+              <li> resize all image files greater than 1MB to within 640 X 480 </li>
+            <li> ignore all files that are greater than 1MB and cannot be processed to 640 X 480</li>
+  </ul>
+</ul>
 #### Note 1: Wikdumps files are either in .xml formats or .xml.bz2 formats. This code only opens these two files.
 #### Note 2: This script only downloads articles [namespace = 0] and not other namespaces like:
 <ol>
