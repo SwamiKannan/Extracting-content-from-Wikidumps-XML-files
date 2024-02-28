@@ -43,8 +43,11 @@ git clone https://github.com/SwamiKannan/Extracting-categories-in-Wikidumps.git
 2. Run the code:
 ```
 python wiki_explore.py <insert path to Wikdumps xml file including the name of the xml file> --output <path to save the output json file> --image_download <True/ False> --resize_and_rebuild <True / False>
-(If no output is given, the output will be stored in the src directory as "output.json"
 ```
+where --image_download describes whether the corresponding images should be downloaded or not
+      -- resize_and_rebuild will resize all image files greater than 1MB to within 640 X 480 
+                                 ignore all files that are greater than 1MB and cannot be processed to 640 X 480
+
 #### Note 1: Wikdumps files are either in .xml formats or .xml.bz2 formats. This code only opens these two files.
 #### Note 2: This script only downloads articles [namespace = 0] and not other namespaces like:
 <ol>
@@ -54,8 +57,11 @@ python wiki_explore.py <insert path to Wikdumps xml file including the name of t
   <li>User: <a href="https://en.wikipedia.org/wiki/User:Groggler/sandbox">Example</a></li>
   <li>Wikipedia: <a href="https://en.wikipedia.org/wiki/Wikipedia:Meetup/San_Francisco/SPIE_2020">Example</a></li>
 </ol>
-
 The script also does not convert pages which are redirect pages i.e. old pages that when you visit re-direct to another page with the latest data. These are pages with the <redirect=""> tags
+  
+#### Note 3: Some of the images are greater than 500 MB on download. Hence, ensure that you have enough space on disk to download these images.
+#### Note 4: --resize_and_rebuild parameter cannot be True if --image_download is False
+#### Note 5: Wiki_category.py is a specialized version of this repo which only returns the title of the page and the category in which the page is. This is for reference work only. 
 
 ## Usage:
 You can load the output json file into Python and extract the content as a Python dictionary as follows:
