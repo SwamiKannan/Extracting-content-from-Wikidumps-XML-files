@@ -42,7 +42,8 @@ git clone https://github.com/SwamiKannan/Extracting-categories-in-Wikidumps.git
 1. Navigate the src folder inside the git repo just downloaded through the command prompt
 2. Run the code:
 ```
-python wiki_explore.py <insert path to Wikdumps xml file including the name of the xml file> --output <path to save the output json file> (If no output is given, the output will be stored in the src directory as "output.json"
+python wiki_explore.py <insert path to Wikdumps xml file including the name of the xml file> --output <path to save the output json file> --image_download <True/ False> --resize_and_rebuild <True / False>
+(If no output is given, the output will be stored in the src directory as "output.json"
 ```
 #### Note 1: Wikdumps files are either in .xml formats or .xml.bz2 formats. This code only opens these two files.
 #### Note 2: This script only downloads articles [namespace = 0] and not other namespaces like:
