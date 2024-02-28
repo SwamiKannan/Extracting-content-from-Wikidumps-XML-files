@@ -63,7 +63,7 @@ The script also does not convert pages which are redirect pages i.e. old pages t
 #### Note 4: --resize_and_rebuild parameter cannot be True if --image_download is False
 #### Note 5: Wiki_category.py is a specialized version of this repo which only returns the title of the page and the category in which the page is. This is for reference work only. 
 
-## Usage:
+3. Parse the output:
 You can load the output json file into Python and extract the content as a Python dictionary as follows:
 ```
 dict_files=[]
@@ -77,6 +77,7 @@ This gives us a list of dictionaries. Each dictionary has three keys:
 1. page: Page title of the article
 2. sentences: Actual content in the article
 3. categories: Categories that this article belongs to
+
 
 
 ## Credits:
